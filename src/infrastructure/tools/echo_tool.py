@@ -11,4 +11,6 @@ class EchoTool(BaseTool):
         return "Returns the input text as is."
 
     def execute(self, text: str) -> str:
+        from src.infrastructure.logger import logger
+        logger.info(f"Executing EchoTool with input: {text}")
         return text

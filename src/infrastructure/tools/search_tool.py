@@ -18,4 +18,6 @@ class SimpleSearchTool(BaseTool):
         return "Searches for keywords in a dummy database."
 
     def execute(self, query: str) -> List[Any]:
+        from src.infrastructure.logger import logger
+        logger.info(f"Executing SimpleSearchTool with query: {query}")
         return [item for item in self._data if query.lower() in item["content"].lower() or query.lower() in item["title"].lower()]

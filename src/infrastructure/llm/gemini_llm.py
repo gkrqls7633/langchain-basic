@@ -33,12 +33,32 @@ class GeminiLLM(LLMProvider):
                 MessagesPlaceholder(variable_name="agent_scratchpad"),
             ])
             
+            # Custom logging callbacks to see detailed tool usage
+            from langchain_core.callbacks import StdOutCallbackHandler
+            from langchain_core.callbacks.base import BaseCallbackHandler
+
+            class ToolLoggingHandler(BaseCallbackHandler):
+                def on_agent_action(self, action: Any, **kwargs: Any) -> Any:
+                    logger.info(f"Step [Agent Action]: LLM decided to use tool '{action.tool}' with input: {action.tool_input}")
+
+                def on_tool_end(self, output: str, **kwargs: Any) -> Any:
+                    logger.info(f"Step [Tool Result]: Tool returned: {output}")
+
+                def on_agent_finish(self, finish: Any, **kwargs: Any) -> Any:
+                    logger.info(f"Step [Agent Final Answer]: {finish.return_values['output']}")
+
             # create_tool_calling_agent is more modern and supports Gemini well
             agent = create_tool_calling_agent(self.llm, tools, mcp_prompt)
-            agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+            agent_executor = AgentExecutor(
+                agent=agent, 
+                tools=tools, 
+                verbose=True,
+                callbacks=[ToolLoggingHandler()] # Attach custom logger
+            )
             
-            logger.info(f"Invoking Gemini with tools for prompt: {prompt}")
+            logger.info(f"--- Starting Agent Execution Flow for: {prompt} ---")
             result = agent_executor.invoke({"input": prompt})
+            logger.info(f"--- Finished Agent Execution Flow ---")
             return result["output"]
         else:
             logger.info(f"Invoking Gemini without tools for prompt: {prompt}")
