@@ -6,10 +6,11 @@ from src.infrastructure.llm.gemini_llm import GeminiLLM
 from src.infrastructure.logger import logger
 from src.application.mcp_service import MCPService
 from src.application.tool_registry import ToolRegistry
-from src.application.tools import CalculatorTool, MemoTool, SearchTool, TimeTool, TodoTool
+from src.application.tools import CalculatorTool, EventDbTool, MemoTool, NationTool, SearchTool, TimeTool, TodoTool
 from src.infrastructure.llm.fake_llm import FakeLLM
-from src.infrastructure.repositories.in_memory import InMemoryMemoRepository, InMemoryTodoRepository
+from src.infrastructure.repositories.in_memory import InMemoryEventRepository, InMemoryMemoRepository, InMemoryTodoRepository
 from src.infrastructure.mcp.server import MCPServerCore
+from src.infrastructure.repositories.postgres import PostgresEventRepository
 
 # Load environment variables from .env file
 load_dotenv()
@@ -28,11 +29,26 @@ tool_registry = ToolRegistry()
 todo_repo = InMemoryTodoRepository()
 memo_repo = InMemoryMemoRepository()
 
+# Event DB: 기본은 docker-compose Postgres로 시도 (DATABASE_URL 없으면 기본값으로 구성)
+# 필요 시 EVENT_DB_MODE=memory 로 강제 in-memory 사용 가능
+event_db_mode = os.getenv("EVENT_DB_MODE", "postgres").strip().lower()
+if event_db_mode == "memory":
+    event_repo = InMemoryEventRepository()
+else:
+    try:
+        event_repo = PostgresEventRepository(database_url=os.getenv("DATABASE_URL"))
+    except Exception as e:
+        logger.warning("PostgresEventRepository init failed; falling back to InMemoryEventRepository: %s", e)
+        event_repo = InMemoryEventRepository()
+
 tool_registry.register(TimeTool())
 tool_registry.register(TodoTool(todo_repo))
 tool_registry.register(MemoTool(memo_repo))
 tool_registry.register(SearchTool())
 tool_registry.register(CalculatorTool())
+tool_registry.register(NationTool())
+tool_registry.register(EventDbTool(event_repo))
+
 
 # 2. Initialize Application service
 mcp_service = MCPService(llm=llm_provider, tool_registry=tool_registry)

@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import List, Optional
 
-from src.domain.models import Memo, TodoItem
+from src.domain.models import Event, Memo, TodoItem
 
 
 class TodoRepository(ABC):
@@ -29,3 +29,11 @@ class MemoRepository(ABC):
 
     @abstractmethod
     def get(self, memo_id: str) -> Optional[Memo]: ...
+
+
+class EventRepository(ABC):
+    @abstractmethod
+    def insert(self, kind: str, payload: dict) -> Event: ...
+
+    @abstractmethod
+    def list(self, limit: int = 50) -> List[Event]: ...

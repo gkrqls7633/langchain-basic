@@ -8,7 +8,7 @@ class ToolTests(unittest.TestCase):
     def test_time_tool(self):
         tool = TimeTool()
         value = tool.execute(format="%Y")
-        self.assertTrue(value.isdigit())
+        self.assertTrue(str(value["now"]).isdigit())
 
     def test_search_tool(self):
         tool = SearchTool()
@@ -47,4 +47,3 @@ class ToolTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
