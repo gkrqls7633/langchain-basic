@@ -27,18 +27,11 @@ class ToolRegistry:
     def list(self) -> List[BaseTool]:
         return list(self._tools.values())
 
-    # Backward-compatible name (기존 코드/예제용)
-    def tools(self) -> List[BaseTool]:
-        return self.list()
-
-    def get(self, name: str) -> Optional[BaseTool]:
+    def get(self, name: str) -> BaseTool:
         tool = self._tools.get(name)
         if not tool:
             raise KeyError(f"Unknown tool: {name}")
         return tool
-
-    def try_get(self, name: str) -> Optional[BaseTool]:
-        return self._tools.get(name)
 
     def names(self) -> List[str]:
         return list(self._tools.keys())

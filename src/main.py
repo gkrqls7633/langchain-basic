@@ -2,28 +2,23 @@ import os
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from src.infrastructure.llm.gemini_llm import GeminiLLM
 from src.infrastructure.logger import logger
 from src.application.mcp_service import MCPService
 from src.application.tool_registry import ToolRegistry
 from src.application.tools import CalculatorTool, EventDbTool, MemoTool, NationTool, SearchTool, TimeTool, TodoTool
-from src.infrastructure.llm.fake_llm import FakeLLM
 from src.infrastructure.repositories.in_memory import InMemoryEventRepository, InMemoryMemoRepository, InMemoryTodoRepository
 from src.infrastructure.mcp.server import MCPServerCore
 from src.infrastructure.repositories.postgres import PostgresEventRepository
+from src.infrastructure.llm.factory import build_llm_provider
 
 # Load environment variables from .env file
 load_dotenv()
 
-logger.info("Starting MCP Service with Gemini...")
+logger.info("Starting MCP Service...")
 
 # Dependency Injection Setup
 # 1. Initialize Infrastructure components
-if os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"):
-    llm_provider = GeminiLLM(model_name=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"))
-else:
-    logger.warning("GEMINI_API_KEY/GOOGLE_API_KEY not set. Falling back to FakeLLM.")
-    llm_provider = FakeLLM()
+llm_provider = build_llm_provider()
 
 tool_registry = ToolRegistry()
 todo_repo = InMemoryTodoRepository()

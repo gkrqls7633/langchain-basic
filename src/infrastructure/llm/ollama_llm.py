@@ -1,32 +1,43 @@
+from __future__ import annotations
+
 import json
 from typing import Any, List, Optional
 
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.agents import AgentExecutor, create_tool_calling_agent
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from src.domain.llm import LLMProvider
 from src.domain.tool import BaseTool
 from src.infrastructure.langchain.tool_adapter import to_langchain_tools
 from src.infrastructure.logger import logger
 
-class GeminiLLM(LLMProvider):
+
+class OllamaLLM(LLMProvider):
     """
-    LangChain-based Gemini implementation of LLMProvider.
+    Ollama adapter using LangChain's ChatOllama.
+
+    Notes:
+    - Uses Ollama native endpoints (/api/chat) via langchain-ollama.
+    - Tool-calling quality depends on the chosen model.
     """
 
-    def __init__(self, model_name: str = "gemini-2.5-flash", temperature: float = 0):
+    def __init__(
+        self,
+        *,
+        base_url: str = "http://localhost:11434",
+        model_name: str = "lfm2.5-thinking:1.2b",
+        temperature: float = 0,
+    ) -> None:
         self.model_name = model_name
-        import os
-        api_key = os.getenv("GEMINI_API_KEY")
-        
-        if not api_key:
-            logger.error("Google API Key not found in environment variables.")
-            
-        self.llm = ChatGoogleGenerativeAI(
-            model=model_name, 
-            temperature=temperature,
-            google_api_key=api_key
-        )
+        self.base_url = base_url
+
+        # Lazy import to avoid hard dependency during unit tests/environments.
+        try:
+            from langchain_ollama import ChatOllama  # type: ignore
+        except Exception as e:  # pragma: no cover
+            raise RuntimeError(
+                "langchain-ollama is required for LLM_BACKEND=ollama. "
+                "Install it with `pip install langchain-ollama`."
+            ) from e
+
+        self.llm = ChatOllama(model=model_name, base_url=base_url, temperature=temperature)
 
     def generate(
         self,
@@ -36,15 +47,18 @@ class GeminiLLM(LLMProvider):
         system_prompt: Optional[str] = None,
     ) -> str:
         if tools:
-            lc_tools = to_langchain_tools(tools)
-            # Generic tool calling agent for Gemini
-            mcp_prompt = ChatPromptTemplate.from_messages([
-                ("system", system_prompt or "You are a helpful assistant with access to tools."),
-                ("human", "{input}"),
-                MessagesPlaceholder(variable_name="agent_scratchpad"),
-            ])
-            
+            from langchain.agents import AgentExecutor, create_tool_calling_agent
             from langchain_core.callbacks.base import BaseCallbackHandler
+            from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+
+            lc_tools = to_langchain_tools(tools)
+            mcp_prompt = ChatPromptTemplate.from_messages(
+                [
+                    ("system", system_prompt or "You are a helpful assistant with access to tools."),
+                    ("human", "{input}"),
+                    MessagesPlaceholder(variable_name="agent_scratchpad"),
+                ]
+            )
 
             audit_tool = next((t for t in tools if t.name == "event_db_tool"), None)
 
@@ -71,10 +85,14 @@ class GeminiLLM(LLMProvider):
                 def on_agent_action(self, action: Any, **kwargs: Any) -> Any:
                     self._last_tool = getattr(action, "tool", None)
                     self._last_args = getattr(action, "tool_input", None)
-                    logger.info(f"Step [Agent Action]: LLM decided to use tool '{action.tool}' with input: {action.tool_input}")
+                    logger.info(
+                        "Step [Agent Action]: LLM decided to use tool '%s' with input: %s",
+                        self._last_tool,
+                        self._last_args,
+                    )
 
-                def on_tool_end(self, output: str, **kwargs: Any) -> Any:
-                    logger.info(f"Step [Tool Result]: Tool returned: {output}")
+                def on_tool_end(self, output: Any, **kwargs: Any) -> Any:
+                    logger.info("Step [Tool Result]: Tool returned: %s", output)
                     if self._last_tool and self._last_tool != "event_db_tool":
                         _audit(
                             kind="tool_call",
@@ -87,7 +105,7 @@ class GeminiLLM(LLMProvider):
                         )
 
                 def on_agent_finish(self, finish: Any, **kwargs: Any) -> Any:
-                    logger.info(f"Step [Agent Final Answer]: {finish.return_values['output']}")
+                    logger.info("Step [Agent Final Answer]: %s", finish.return_values["output"])
                     _audit(
                         kind="final",
                         payload={
@@ -96,23 +114,21 @@ class GeminiLLM(LLMProvider):
                         },
                     )
 
-            # create_tool_calling_agent is more modern and supports Gemini well
             agent = create_tool_calling_agent(self.llm, lc_tools, mcp_prompt)
             agent_executor = AgentExecutor(
-                agent=agent, 
+                agent=agent,
                 tools=lc_tools,
                 verbose=True,
-                callbacks=[ToolLoggingHandler()] # Attach custom logger
+                callbacks=[ToolLoggingHandler()],
             )
-            
-            logger.info(f"--- Starting Agent Execution Flow for: {user_input} ---")
+
+            logger.info("--- Starting Agent Execution Flow for: %s ---", user_input)
             result = agent_executor.invoke({"input": user_input})
-            logger.info(f"--- Finished Agent Execution Flow ---")
+            logger.info("--- Finished Agent Execution Flow ---")
             return result["output"]
-        else:
-            logger.info(f"Invoking Gemini without tools for prompt: {user_input}")
-            response = self.llm.invoke(user_input)
-            return response.content
+
+        response = self.llm.invoke(user_input)
+        return getattr(response, "content", str(response))
 
     def get_model_name(self) -> str:
         return self.model_name

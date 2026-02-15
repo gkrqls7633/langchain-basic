@@ -1,9 +1,9 @@
 langchain
 langchain-google-genai
-langchain-openai
+langchain-ollama
 fastapi
 uvicorn
-pydantic
+pydantic>=2,<3
 python-dotenv
 pytz
 SQLAlchemy

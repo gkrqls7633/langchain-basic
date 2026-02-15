@@ -17,5 +17,22 @@ services:
       timeout: 3s
       retries: 20
 
+  # Local LLM (Ollama)
+  # Run with: docker-compose up -d ollama
+  # Then pull a small model: docker-compose exec ollama ollama pull qwen2.5:1.5b
+  ollama:
+    image: ollama/ollama:latest
+    container_name: personal-assistant-ollama
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - ollama:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
 volumes:
   pgdata:
+  ollama:

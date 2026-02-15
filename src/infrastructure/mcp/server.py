@@ -25,7 +25,7 @@ class MCPServerCore:
                 "description": tool.description,
                 "parameters": dict(tool.parameters),
             }
-            for tool in self._tool_registry.tools()
+            for tool in self._tool_registry.list()
         ]
 
     def call_tool(self, name: str, args: Dict[str, Any] | None = None) -> Any:
@@ -36,4 +36,3 @@ class MCPServerCore:
         if not self._assistant:
             raise RuntimeError("Assistant(MCPService) is not configured.")
         return self._assistant.process_query(prompt)
-

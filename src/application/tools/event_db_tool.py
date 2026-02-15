@@ -5,14 +5,7 @@ import logging
 from dataclasses import asdict
 from typing import Any, Dict, Literal, Optional, Type, Union
 
-from pydantic import BaseModel, Field
-
-try:  # Pydantic v2
-    from pydantic import field_validator  # type: ignore
-    _FIELD_VALIDATOR_V2 = True
-except Exception:  # Pydantic v1
-    from pydantic import validator as field_validator  # type: ignore
-    _FIELD_VALIDATOR_V2 = False
+from pydantic import BaseModel, Field, field_validator
 
 from src.domain.repositories import EventRepository
 from src.domain.tool import BaseTool
@@ -29,39 +22,22 @@ class EventDbToolInput(BaseModel):
     )
     limit: int = Field(default=20, description="list 시 최대 반환 개수 (기본 20)")
 
-    if _FIELD_VALIDATOR_V2:
-        @field_validator("payload", mode="before")  # type: ignore[misc]
-        @classmethod
-        def _coerce_payload(cls, v: Any) -> Dict[str, Any]:
-            if v is None or v == "":
-                return {}
-            if isinstance(v, dict):
-                return v
-            if isinstance(v, str):
-                try:
-                    parsed = json.loads(v)
-                except Exception as e:
-                    raise ValueError("payload must be a dict or a JSON object string") from e
-                if not isinstance(parsed, dict):
-                    raise ValueError("payload JSON must decode to an object/dict")
-                return parsed
-            raise ValueError("payload must be a dict or a JSON object string")
-    else:
-        @field_validator("payload", pre=True)  # type: ignore[misc]
-        def _coerce_payload(cls, v: Any) -> Dict[str, Any]:
-            if v is None or v == "":
-                return {}
-            if isinstance(v, dict):
-                return v
-            if isinstance(v, str):
-                try:
-                    parsed = json.loads(v)
-                except Exception as e:
-                    raise ValueError("payload must be a dict or a JSON object string") from e
-                if not isinstance(parsed, dict):
-                    raise ValueError("payload JSON must decode to an object/dict")
-                return parsed
-            raise ValueError("payload must be a dict or a JSON object string")
+    @field_validator("payload", mode="before")
+    @classmethod
+    def _coerce_payload(cls, v: Any) -> Dict[str, Any]:
+        if v is None or v == "":
+            return {}
+        if isinstance(v, dict):
+            return v
+        if isinstance(v, str):
+            try:
+                parsed = json.loads(v)
+            except Exception as e:
+                raise ValueError("payload must be a dict or a JSON object string") from e
+            if not isinstance(parsed, dict):
+                raise ValueError("payload JSON must decode to an object/dict")
+            return parsed
+        raise ValueError("payload must be a dict or a JSON object string")
 
 
 class EventDbTool(BaseTool):

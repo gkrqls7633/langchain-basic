@@ -1,7 +1,11 @@
 import unittest
 
-from src.application.tools import CalculatorTool, MemoTool, SearchTool, TimeTool, TodoTool
-from src.infrastructure.repositories.in_memory import InMemoryMemoRepository, InMemoryTodoRepository
+from src.application.tools import CalculatorTool, EventDbTool, MemoTool, NationTool, SearchTool, TimeTool, TodoTool
+from src.infrastructure.repositories.in_memory import (
+    InMemoryEventRepository,
+    InMemoryMemoRepository,
+    InMemoryTodoRepository,
+)
 
 
 class ToolTests(unittest.TestCase):
@@ -9,6 +13,11 @@ class ToolTests(unittest.TestCase):
         tool = TimeTool()
         value = tool.execute(format="%Y")
         self.assertTrue(str(value["now"]).isdigit())
+
+    def test_time_tool_timezone(self):
+        tool = TimeTool()
+        out = tool.execute(format="%Y-%m-%d %H:%M", timezone="Europe/London")
+        self.assertEqual(out["timezone"], "Europe/London")
 
     def test_search_tool(self):
         tool = SearchTool()
@@ -43,6 +52,19 @@ class ToolTests(unittest.TestCase):
         self.assertEqual(memo["content"], "c")
         memos = tool.execute(action="list")
         self.assertEqual(len(memos), 1)
+
+    def test_nation_tool(self):
+        tool = NationTool()
+        out = tool.execute(country="Europe/London")
+        self.assertEqual(out["resolved"]["timezone"], "Europe/London")
+
+    def test_event_db_tool_insert_and_list(self):
+        repo = InMemoryEventRepository()
+        tool = EventDbTool(repo)
+        inserted = tool.execute(action="insert", payload='{"kind":"test","x":1}')
+        self.assertIn("inserted", inserted)
+        listed = tool.execute(action="list", limit=10)
+        self.assertEqual(len(listed["events"]), 1)
 
 
 if __name__ == "__main__":
