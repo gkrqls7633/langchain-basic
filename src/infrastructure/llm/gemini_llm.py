@@ -1,8 +1,11 @@
 from typing import Any, List, Optional
+
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from src.domain.llm import LLMProvider
+from src.domain.tool import BaseTool
+from src.infrastructure.langchain.tool_adapter import to_langchain_tools
 from src.infrastructure.logger import logger
 
 class GeminiLLM(LLMProvider):
@@ -24,11 +27,18 @@ class GeminiLLM(LLMProvider):
             google_api_key=api_key
         )
 
-    def generate(self, prompt: str, tools: Optional[List[Any]] = None) -> str:
+    def generate(
+        self,
+        user_input: str,
+        *,
+        tools: Optional[List[BaseTool]] = None,
+        system_prompt: Optional[str] = None,
+    ) -> str:
         if tools:
+            lc_tools = to_langchain_tools(tools)
             # Generic tool calling agent for Gemini
             mcp_prompt = ChatPromptTemplate.from_messages([
-                ("system", "You are a helpful assistant with access to tools."),
+                ("system", system_prompt or "You are a helpful assistant with access to tools."),
                 ("human", "{input}"),
                 MessagesPlaceholder(variable_name="agent_scratchpad"),
             ])
@@ -48,21 +58,21 @@ class GeminiLLM(LLMProvider):
                     logger.info(f"Step [Agent Final Answer]: {finish.return_values['output']}")
 
             # create_tool_calling_agent is more modern and supports Gemini well
-            agent = create_tool_calling_agent(self.llm, tools, mcp_prompt)
+            agent = create_tool_calling_agent(self.llm, lc_tools, mcp_prompt)
             agent_executor = AgentExecutor(
                 agent=agent, 
-                tools=tools, 
+                tools=lc_tools,
                 verbose=True,
                 callbacks=[ToolLoggingHandler()] # Attach custom logger
             )
             
-            logger.info(f"--- Starting Agent Execution Flow for: {prompt} ---")
-            result = agent_executor.invoke({"input": prompt})
+            logger.info(f"--- Starting Agent Execution Flow for: {user_input} ---")
+            result = agent_executor.invoke({"input": user_input})
             logger.info(f"--- Finished Agent Execution Flow ---")
             return result["output"]
         else:
-            logger.info(f"Invoking Gemini without tools for prompt: {prompt}")
-            response = self.llm.invoke(prompt)
+            logger.info(f"Invoking Gemini without tools for prompt: {user_input}")
+            response = self.llm.invoke(user_input)
             return response.content
 
     def get_model_name(self) -> str:

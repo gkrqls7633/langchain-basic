@@ -1,5 +1,9 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from typing import Any, List, Dict, Optional
+from typing import Any, List, Optional
+
+from src.domain.tool import BaseTool
 
 class LLMProvider(ABC):
     """
@@ -8,9 +12,18 @@ class LLMProvider(ABC):
     """
     
     @abstractmethod
-    def generate(self, prompt: str, tools: Optional[List[Any]] = None) -> str:
+    def generate(
+        self,
+        user_input: str,
+        *,
+        tools: Optional[List[BaseTool]] = None,
+        system_prompt: Optional[str] = None,
+    ) -> str:
         """
-        Generate a response for a given prompt, optionally using tools.
+        Generate a response for a given input, optionally using tools.
+
+        - tools: domain tools (LangChain 변환은 infrastructure에서 처리)
+        - system_prompt: tool 사용을 강제하는 정책 프롬프트 등
         """
         pass
 
